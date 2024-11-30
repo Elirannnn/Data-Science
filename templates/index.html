@@ -52,6 +52,19 @@
         button:hover {
             background-color: #0056b3;
         }
+        .slider-container {
+            margin-bottom: 20px;
+        }
+        .slider-label {
+            font-size: 1em;
+            margin-bottom: 5px;
+        }
+        .slider-value {
+            font-weight: bold;
+        }
+        input[type="range"] {
+            width: 100%;
+        }
         table {
             width: 80%;
             max-width: 800px;
@@ -73,62 +86,42 @@
         a button {
             margin-top: 20px;
         }
-        .collapse {
-            display: none;
-        }
     </style>
     <script>
-        function toggleCollapse() {
-            var collapseContent = document.getElementById('assignments');
-            collapseContent.classList.toggle('collapse');
+        function updateSliderValue(value) {
+            document.getElementById('sliderValue').textContent = value;
         }
     </script>
 </head>
 <body>
     <h1>שיבוץ חיילים ליחידות</h1>
-    <button onclick="toggleCollapse()">הצג/הסתר תוצאות שיבוץ אופטימלי</button>
-    <!-- טבלה שמוצגת רק אחרי שהכפתור נלחץ -->
-<div id="assignments" class="collapse">
-
-    <!-- טופס להזנת הקצאות -->
     <form method="POST" enctype="multipart/form-data">
+        <div class="slider-container">
+            <label class="slider-label" for="weight_unit">אחוז השפעה ליחידה:</label>
+            <input type="range" id="weight_unit" name="weight_unit" min="0" max="100" value="{{ weight_unit }}" oninput="updateSliderValue(this.value)">
+            <span class="slider-value" id="sliderValue">{{ weight_unit }}</span>%
+        </div>
         <label for="file">בחר קובץ:</label>
         <input type="file" name="file" required><br><br>
 
-        <label for="הנדסה">הנדסה:</label>
-        <input type="number" name="הנדסה" min="0" required><br><br>
-        
-        <label for="מאב">מאב:</label>
-        <input type="number" name="מאב" min="0" required><br><br>
-        
-        <label for="מהן">מהן:</label>
-        <input type="number" name="מהן" min="0" required><br><br>
-
-        <label for="מעמ">מעמ:</label>
-        <input type="number" name="מעמ" min="0" required><br><br>
-
-        <label for="מתן">מתן:</label>
-        <input type="number" name="מתן" min="0" required><br><br>
-
-        <label for="מטס">מטס:</label>
-        <input type="number" name="מטס" min="0" required><br><br>
-
-        <label for="תשתיות">תשתיות:</label>
-        <input type="number" name="תשתיות" min="0" required><br><br>
+        {% for unit in ['הנדסה', 'מאב', 'מהן', 'מעמ', 'מתן', 'מטס', 'תשתיות'] %}
+        <label for="{{ unit }}">{{ unit }}:</label>
+        <input type="number" name="{{ unit }}" min="0" required><br><br>
+        {% endfor %}
 
         <button type="submit">התחל עיבוד</button>
     </form>
-</div>
+
     {% if assignments %}
         <h2>תוצאות השיבוץ האופטימלי</h2>
-        <table border="1">
+        <table>
             <tr>
                 <th>שם החייל</th>
                 <th>עיר מגורים</th>
                 <th>יחידה</th>
                 <th>דירוג חייל</th>
                 <th>דירוג יחידה</th>
-                <th>ממוצע יחידה</th>
+                <th>ממוצע</th>
             </tr>
             {% for assignment in assignments %}
             <tr>
@@ -137,16 +130,13 @@
                 <td>{{ assignment['יחידה'] }}</td>
                 <td>{{ assignment['דירוג החייל'] }}</td>
                 <td>{{ assignment['דירוג היחידה'] }}</td>
-                <td>{{ assignment['ממוצע יחידה'] }}</td>
+                <td>{{ assignment['ממוצע'] }}</td>
             </tr>
             {% endfor %}
         </table>
-
-        <!-- כפתור להורדת קובץ אקסל -->
-        <a href="{{ url_for('download_file') }}">
+        <a href="{{ url_for('download_file', path=temp_file) }}">
             <button>הורד קובץ אקסל</button>
         </a>
     {% endif %}
-
 </body>
 </html>

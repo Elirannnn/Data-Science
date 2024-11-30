@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import Flask, render_template, request, jsonify, send_file, url_for
 from flask_cors import CORS
 import os
 import pandas as pd
@@ -9,7 +9,8 @@ app = Flask(__name__)
 CORS(app)
 
 # פונקציית עיבוד הנתונים
-def clean_and_sort_data(input_file, allocations):
+def clean_and_sort_data(input_file, allocations, weight_unit):
+    weight_soldier = 1 - weight_unit  # משלים את האחוז ליחידה
     df = pd.read_excel(input_file)
     cleaned_data = []
 
@@ -24,8 +25,6 @@ def clean_and_sort_data(input_file, allocations):
             if match:
                 unit_name = match.group(1).strip()
                 unit_score = int(match.group(2))
-                weight_unit = 0.8
-                weight_soldier = 0.2
                 average_score = (weight_unit * unit_score) + (weight_soldier * (8 - priority))
                 cleaned_data.append({
                     'שם החייל': soldier_name,
@@ -59,35 +58,29 @@ def clean_and_sort_data(input_file, allocations):
                 })
                 allocations[unit_name] -= 1
                 used_units.add(unit_name)
-            cleaned_df = cleaned_df[~cleaned_df['שם החייל'].isin([a['שם החייל'] for a in assignments])]
+        cleaned_df = cleaned_df[~cleaned_df['שם החייל'].isin([a['שם החייל'] for a in assignments])]
         if cleaned_df.empty:
             break
 
-    # יצירת DataFrame מתוך השיבוצים
     assignments_df = pd.DataFrame(assignments)
 
-    # חישוב ממוצע דירוג יחידה רק עבור החיילים ששובצו
     if not assignments_df.empty:
         assigned_unit_avg = assignments_df.groupby('יחידה')['דירוג היחידה'].mean().reset_index()
-        assigned_unit_avg.columns = ['יחידה', 'ממוצע יחידה']
+        assigned_unit_avg.columns = ['יחידה', 'ממוצע']
 
-    # מיזוג טבלת הממוצעים של השיבוצים חזרה
-    assignments_df = assignments_df.merge(assigned_unit_avg, on='יחידה', how='left')
+        assignments_df = assignments_df.merge(assigned_unit_avg, on='יחידה', how='left')
+        assignments_df = assignments_df.sort_values(by='יחידה', ascending=True)
 
-    # מיון לפי שם היחידה
-    assignments_df = assignments_df.sort_values(by='יחידה', ascending=True)
-
-    # שמירת הקובץ בקובץ זמני
     temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".xlsx")
     assignments_df.to_excel(temp_file.name, index=False)
 
     return assignments_df.to_dict(orient='records'), temp_file.name
 
 
-# דף הבית
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
+        weight_unit = float(request.form['weight_unit']) / 100  # המרה לאחוז
         allocations = {
             'הנדסה': int(request.form['הנדסה']),
             'מאב': int(request.form['מאב']),
@@ -98,21 +91,17 @@ def index():
             'תשתיות': int(request.form['תשתיות'])
         }
 
-        # קבלת קובץ מהמשתמש
         file = request.files['file']
         if file:
             input_file = os.path.join('uploads', file.filename)
             os.makedirs('uploads', exist_ok=True)
             file.save(input_file)
 
-            assignments, temp_file_path = clean_and_sort_data(input_file, allocations)
+            assignments, temp_file_path = clean_and_sort_data(input_file, allocations, weight_unit)
+            return render_template('index.html', assignments=assignments, temp_file=temp_file_path, weight_unit=int(weight_unit * 100))
 
-            # שמירה של הנתיב בקובץ זמני להצגה מאוחרת יותר
-            return render_template('index.html', assignments=assignments, temp_file=temp_file_path)
+    return render_template('index.html', weight_unit=80)  # ברירת מחדל
 
-    return render_template('index.html')
-
-# הורדת קובץ השיבוצים
 @app.route('/download', methods=['GET'])
 def download_file():
     temp_file = request.args.get('path')
