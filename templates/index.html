@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="he">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>שיבוץ חיילים</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            color: #333;
+            margin: 0;
+            padding: 0;
+        }
+        h1, h2 {
+            text-align: center;
+            color: #007bff;
+        }
+        form {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            width: 80%;
+            max-width: 600px;
+            margin: 30px auto;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        label {
+            font-size: 1.1em;
+            margin-bottom: 8px;
+            display: block;
+            color: #333;
+        }
+        input[type="number"], input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            margin-bottom: 15px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 1em;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            font-size: 1.1em;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        table {
+            width: 80%;
+            max-width: 800px;
+            margin: 30px auto;
+            border-collapse: collapse;
+            text-align: center;
+        }
+        th, td {
+            padding: 10px;
+            border: 1px solid #ddd;
+        }
+        th {
+            background-color: #007bff;
+            color: white;
+        }
+        td {
+            background-color: #fff;
+        }
+        a button {
+            margin-top: 20px;
+        }
+        .collapse {
+            display: none;
+        }
+    </style>
+    <script>
+        function toggleCollapse() {
+            var collapseContent = document.getElementById('assignments');
+            collapseContent.classList.toggle('collapse');
+        }
+    </script>
+</head>
+<body>
+    <h1>שיבוץ חיילים ליחידות</h1>
+    <button onclick="toggleCollapse()">הצג/הסתר תוצאות שיבוץ אופטימלי</button>
+    <!-- טבלה שמוצגת רק אחרי שהכפתור נלחץ -->
+<div id="assignments" class="collapse">
+
+    <!-- טופס להזנת הקצאות -->
+    <form method="POST" enctype="multipart/form-data">
+        <label for="file">בחר קובץ:</label>
+        <input type="file" name="file" required><br><br>
+
+        <label for="הנדסה">הנדסה:</label>
+        <input type="number" name="הנדסה" min="0" required><br><br>
+        
+        <label for="מאב">מאב:</label>
+        <input type="number" name="מאב" min="0" required><br><br>
+        
+        <label for="מהן">מהן:</label>
+        <input type="number" name="מהן" min="0" required><br><br>
+
+        <label for="מעמ">מעמ:</label>
+        <input type="number" name="מעמ" min="0" required><br><br>
+
+        <label for="מתן">מתן:</label>
+        <input type="number" name="מתן" min="0" required><br><br>
+
+        <label for="מטס">מטס:</label>
+        <input type="number" name="מטס" min="0" required><br><br>
+
+        <label for="תשתיות">תשתיות:</label>
+        <input type="number" name="תשתיות" min="0" required><br><br>
+
+        <button type="submit">התחל עיבוד</button>
+    </form>
+</div>
+    {% if assignments %}
+        <h2>תוצאות השיבוץ האופטימלי</h2>
+        <table border="1">
+            <tr>
+                <th>שם החייל</th>
+                <th>עיר מגורים</th>
+                <th>יחידה</th>
+                <th>דירוג חייל</th>
+                <th>דירוג יחידה</th>
+                <th>ממוצע יחידה</th>
+            </tr>
+            {% for assignment in assignments %}
+            <tr>
+                <td>{{ assignment['שם החייל'] }}</td>
+                <td>{{ assignment['עיר מגורים'] }}</td>
+                <td>{{ assignment['יחידה'] }}</td>
+                <td>{{ assignment['דירוג החייל'] }}</td>
+                <td>{{ assignment['דירוג היחידה'] }}</td>
+                <td>{{ assignment['ממוצע יחידה'] }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+
+        <!-- כפתור להורדת קובץ אקסל -->
+        <a href="{{ url_for('download_file') }}">
+            <button>הורד קובץ אקסל</button>
+        </a>
+    {% endif %}
+
+</body>
+</html>
