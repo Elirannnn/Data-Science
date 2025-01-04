@@ -4,12 +4,166 @@ import os
 import pandas as pd
 import re
 import tempfile
+from difflib import get_close_matches
 
-app = Flask(__name__)
-CORS(app)
+# Add the new UnitNameCorrector class
+class UnitNameCorrector:
+    def __init__(self):
+        self.valid_units = {
+            'הנדסה',
+            'מאב',
+            'מהן',
+            'מעמ',
+            'מתן',
+            'מטס',
+            'תשתיות'
+        }
+        
+        self.common_variations = {
+            'מת"ן': 'מתן',
+            'מא״ב': 'מאב',
+            'מה״ןו': 'מהן',
+            'מתןןן': 'מתן',
+            'מתנ': 'מתן',
+            'הנדס': 'הנדסה',
+            'הנדסת': 'הנדסה',
+            'הנדסהה': 'הנדסה',
+            'מאבב': 'מאב',
+            'מ"א"ב': 'מאב',
+            'מהנ': 'מהן',
+            'מהןן': 'מהן',
+            'מעממ': 'מעמ',
+            'מעם': 'מעמ',
+            'מטסס': 'מטס',
+            'תשתית': 'תשתיות',
+            'תשתיותת': 'תשתיות'
+        }
 
+    def find_possible_matches(self, unit_name, cutoff=0.6):
+        """מוצא את כל ההתאמות האפשריות עם ציון הדמיון שלהן"""
+        if not isinstance(unit_name, str):
+            return []
+
+        cleaned_name = re.sub(r'["""]', '', unit_name.strip())
+        matches = []
+        
+        # בדיקת התאמות במילון השגיאות הנפוצות
+        if cleaned_name in self.common_variations:
+            matches.append((self.common_variations[cleaned_name], 1.0))  # ציון 1.0 להתאמה מדויקת
+            
+        # חיפוש התאמות מבוססות דמיון מחרוזות
+        for valid_unit in self.valid_units:
+            similarity = self.calculate_similarity(cleaned_name, valid_unit)
+            if similarity >= cutoff:
+                matches.append((valid_unit, similarity))
+        
+        # מיון לפי ציון הדמיון בסדר יורד
+        return sorted(matches, key=lambda x: x[1], reverse=True)
+
+    def calculate_similarity(self, str1, str2):
+        """מחשב את מידת הדמיון בין שתי מחרוזות"""
+        max_len = max(len(str1), len(str2))
+        if max_len == 0:
+            return 0
+        
+        # חישוב מרחק לוונשטיין
+        distance = self.levenshtein_distance(str1, str2)
+        return 1 - (distance / max_len)
+
+    def levenshtein_distance(self, str1, str2):
+        """מחשב את מרחק לוונשטיין בין שתי מחרוזות"""
+        if len(str1) < len(str2):
+            return self.levenshtein_distance(str2, str1)
+
+        if len(str2) == 0:
+            return len(str1)
+
+        previous_row = range(len(str2) + 1)
+        for i, c1 in enumerate(str1):
+            current_row = [i + 1]
+            for j, c2 in enumerate(str2):
+                insertions = previous_row[j + 1] + 1
+                deletions = current_row[j] + 1
+                substitutions = previous_row[j] + (c1 != c2)
+                current_row.append(min(insertions, deletions, substitutions))
+            previous_row = current_row
+
+        return previous_row[-1]
+
+    def correct_unit_name(self, unit_name):
+        """מתקן שם יחידה עם טיפול במקרים של דו-משמעות"""
+        if not isinstance(unit_name, str):
+            return unit_name
+
+        # מציאת כל ההתאמות האפשריות
+        matches = self.find_possible_matches(unit_name)
+        
+        if not matches:
+            return unit_name
+            
+        # אם יש יותר מהתאמה אחת עם ציון דמיון קרוב
+        close_matches = [m for m in matches if abs(m[1] - matches[0][1]) < 0.1]
+        
+        if len(close_matches) > 1:
+            possible_units = [m[0] for m in close_matches]
+            print(f'אזהרה: נמצאו מספר אפשרויות תיקון ל-"{unit_name}":')
+            for unit, score in close_matches:
+                print(f'- {unit} (ציון דמיון: {score:.2%})')
+            # במקרה של ספק, נחזיר את ההתאמה הטובה ביותר אבל נציג אזהרה
+            return close_matches[0][0]
+        
+        # אם יש התאמה ברורה אחת
+        corrected = matches[0][0]
+        if corrected != unit_name:
+            print(f'טעות איות נמצאה: {unit_name}, תיקון: {corrected} (ציון דמיון: {matches[0][1]:.2%})')
+        return corrected
+
+    def correct_ratings_string(self, ratings_string):
+        """מתקן את שמות היחידות בכל מחרוזת הדירוגים"""
+        if not isinstance(ratings_string, str):
+            return ratings_string
+            
+        corrected_lines = []
+        for line in ratings_string.split('\n'):
+            match = re.match(r"(.*?)\((\d+)\)", line.strip())
+            if match:
+                unit_name = match.group(1).strip()
+                rating = match.group(2)
+                corrected_name = self.correct_unit_name(unit_name)
+                corrected_lines.append(f"{corrected_name}({rating})")
+            else:
+                corrected_lines.append(line)
+                
+        return '\n'.join(corrected_lines)
+    
+def process_excel_with_correction(df):
+    """Process the Excel dataframe and correct unit names."""
+    corrector = UnitNameCorrector()
+    
+    # Create a copy of the dataframe
+    df_corrected = df.copy()
+    
+    # Apply correction to the 'יחידות ודירוגים' column
+    df_corrected['יחידות ודירוגים'] = df_corrected['יחידות ודירוגים'].apply(
+        corrector.correct_ratings_string
+    )
+    
+    # If there's a 'יחידה מקדימה' column, correct those names too
+    if 'יחידה מקדימה' in df_corrected.columns:
+        df_corrected['יחידה מקדימה'] = df_corrected['יחידה מקדימה'].apply(
+            corrector.correct_unit_name
+        )
+    
+    return df_corrected
+
+# Update the clean_and_sort_data function
 def clean_and_sort_data(input_file, allocations, unit_weights):
+    # Read the Excel file
     df = pd.read_excel(input_file)
+    
+    # Apply the correction before processing
+    df = process_excel_with_correction(df)
+    
     cleaned_data = []
     assignments = []
     assigned_soldiers = set()
@@ -161,6 +315,9 @@ def clean_and_sort_data(input_file, allocations, unit_weights):
 
     return assignments, temp_file.name
 
+app = Flask(__name__)
+CORS(app)
+
 @app.route('/', methods=['GET', 'POST'])
 def index():
     if request.method == 'POST':
@@ -203,7 +360,6 @@ def download_file():
         return send_file(temp_file, as_attachment=True)
     else:
         return jsonify({'error': 'File not found'}), 404
-
 
 if __name__ == '__main__':
     app.run(debug=True)
