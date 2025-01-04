@@ -90,7 +90,23 @@ class UnitNameCorrector:
 
         return previous_row[-1]
 
-    def correct_unit_name(self, unit_name):
+    def get_existing_units_from_ratings(self, ratings_string):
+        """מחלץ את רשימת היחידות הקיימות במחרוזת הדירוגים"""
+        existing_units = set()
+        if not isinstance(ratings_string, str):
+            return existing_units
+            
+        for line in ratings_string.split('\n'):
+            match = re.match(r"(.*?)\((\d+)\)", line.strip())
+            if match:
+                unit_name = match.group(1).strip()
+                # מנקה את השם ומוסיף לרשימת היחידות הקיימות
+                cleaned_name = re.sub(r'["""]', '', unit_name.strip())
+                if cleaned_name in self.valid_units:
+                    existing_units.add(cleaned_name)
+        return existing_units
+
+    def correct_unit_name(self, unit_name, ratings_string=None):
         """מתקן שם יחידה עם טיפול במקרים של דו-משמעות"""
         if not isinstance(unit_name, str):
             return unit_name
@@ -104,12 +120,21 @@ class UnitNameCorrector:
         # אם יש יותר מהתאמה אחת עם ציון דמיון קרוב
         close_matches = [m for m in matches if abs(m[1] - matches[0][1]) < 0.1]
         
-        if len(close_matches) > 1:
-            possible_units = [m[0] for m in close_matches]
+        if len(close_matches) > 1 and ratings_string:
+            # מוצא את היחידות שכבר קיימות במחרוזת הדירוגים
+            existing_units = self.get_existing_units_from_ratings(ratings_string)
+            
+            # בודק אילו מההתאמות כבר מופיעות במחרוזת הדירוגים
+            for unit, score in close_matches:
+                if unit not in existing_units:
+                    # מחזיר את היחידה שלא נמצאה עדיין במחרוזת הדירוגים
+                    print(f'תיקון אוטומטי: {unit_name} -> {unit} (היחידה האחרת כבר קיימת ברשימה)')
+                    return unit
+            
+            # אם לא נמצאה התאמה חד-משמעית, נחזיר את ההתאמה הטובה ביותר
             print(f'אזהרה: נמצאו מספר אפשרויות תיקון ל-"{unit_name}":')
             for unit, score in close_matches:
                 print(f'- {unit} (ציון דמיון: {score:.2%})')
-            # במקרה של ספק, נחזיר את ההתאמה הטובה ביותר אבל נציג אזהרה
             return close_matches[0][0]
         
         # אם יש התאמה ברורה אחת
@@ -129,13 +154,14 @@ class UnitNameCorrector:
             if match:
                 unit_name = match.group(1).strip()
                 rating = match.group(2)
-                corrected_name = self.correct_unit_name(unit_name)
+                # מעביר את כל מחרוזת הדירוגים לפונקציית התיקון
+                corrected_name = self.correct_unit_name(unit_name, ratings_string)
                 corrected_lines.append(f"{corrected_name}({rating})")
             else:
                 corrected_lines.append(line)
                 
         return '\n'.join(corrected_lines)
-    
+
 def process_excel_with_correction(df):
     """Process the Excel dataframe and correct unit names."""
     corrector = UnitNameCorrector()
