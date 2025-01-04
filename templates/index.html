@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" href="{{ url_for('static', filename='/images/OfekUnit.png') }}" type="image/png">
     <title>שיבוץ חיילים</title>
     <style>
 body {
@@ -189,41 +190,121 @@ input[type="file"]::file-selector-button:hover {
     document.getElementById('sliderValue').textContent = value;
 }
 
+function syncSliders() {
+    const masterValue = document.getElementById('weight_unit_master').value;
+    const unitSliders = [
+        'weight_unit_הנדסה', 
+        'weight_unit_מאב', 
+        'weight_unit_מהן', 
+        'weight_unit_מעמ', 
+        'weight_unit_מתן', 
+        'weight_unit_מטס', 
+        'weight_unit_תשתיות'
+    ];
+
+    unitSliders.forEach(sliderId => {
+        document.getElementById(sliderId).value = masterValue;
+        updateUnitSliderValue(sliderId);
+    });
+}
+
+function updateUnitSliderValue(sliderId) {
+    const slider = document.getElementById(sliderId);
+    const valueSpanId = sliderId + '_value';
+    document.getElementById(valueSpanId).textContent = slider.value;
+}
+
 function toggleForm() {
     const form = document.getElementById('mainForm');
     const toggleBtn = document.getElementById('toggleFormBtn');
     
     form.classList.toggle('hidden');
     
-    // Change button text based on form visibility
     toggleBtn.textContent = form.classList.contains('hidden') 
         ? 'הצג טופס' 
         : 'הסתר טופס';
 }
 
-// Optional: Automatically hide form after submission
 document.addEventListener('DOMContentLoaded', function() {
+    // שחזור ערכים מ-localStorage
+    restoreFormValues();
+
     const form = document.getElementById('mainForm');
     const submitBtn = form.querySelector('button[type="submit"]');
     
     submitBtn.addEventListener('click', function() {
-        // Optional slight delay to allow form submission
+        // שמירת ערכי טופס ב-localStorage לפני שליחה
+        saveFormValues();
+        
+        // הסתרת הטופס
         setTimeout(toggleForm, 100);
     });
 });
+
+function saveFormValues() {
+    // שמירת ערכי slider ראשי
+    localStorage.setItem('weight_unit_master', document.getElementById('weight_unit_master').value);
+
+    // שמירת ערכי slider יחידות
+    const units = ['הנדסה', 'מאב', 'מהן', 'מעמ', 'מתן', 'מטס', 'תשתיות'];
+    units.forEach(unit => {
+        localStorage.setItem(`weight_unit_${unit}`, document.getElementById(`weight_unit_${unit}`).value);
+        localStorage.setItem(`${unit}_input`, document.querySelector(`input[name="${unit}"]`).value);
+    });
+}
+
+function restoreFormValues() {
+    // שחזור ערך slider ראשי
+    const masterValue = localStorage.getItem('weight_unit_master');
+    if (masterValue) {
+        document.getElementById('weight_unit_master').value = masterValue;
+    }
+
+    // שחזור ערכי slider יחידות
+    const units = ['הנדסה', 'מאב', 'מהן', 'מעמ', 'מתן', 'מטס', 'תשתיות'];
+    units.forEach(unit => {
+        const unitSliderValue = localStorage.getItem(`weight_unit_${unit}`);
+        const unitInputValue = localStorage.getItem(`${unit}_input`);
+
+        if (unitSliderValue) {
+            const slider = document.getElementById(`weight_unit_${unit}`);
+            slider.value = unitSliderValue;
+            updateUnitSliderValue(`weight_unit_${unit}`);
+        }
+
+        if (unitInputValue) {
+            document.querySelector(`input[name="${unit}"]`).value = unitInputValue;
+        }
+    });
+}
     </script>
 </head>
 <body>
     <h1>שיבוץ חיילים ליחידות</h1>
-    
+    <div style="position: fixed; top: 20px; right: 20px; width: 150px; text-align: center; z-index: 1000;">
+        <img src="{{ url_for('static', filename='images/OfekUnit.png') }}" alt="יחידת אופק" style="max-width: 100%; max-height: 100px; object-fit: contain;">
+        <div style="margin-top: 5px; font-weight: bold; color: #1a3b5c; font-size: 18px; letter-spacing: 2px;">אופק 324</div>
+    </div>
     <button id="toggleFormBtn" class="toggle-form-btn" onclick="toggleForm()">הסתר טופס</button>
     
     <form id="mainForm" method="POST" enctype="multipart/form-data">
+        <!-- Master synchronization slider -->
         <div class="slider-container">
-            <label class="slider-label" for="weight_unit">אחוז השפעה ליחידה:</label>
-            <input type="range" id="weight_unit" name="weight_unit" min="0" max="100" value="{{ weight_unit }}" oninput="updateSliderValue(this.value)">
-            <span class="slider-value" id="sliderValue">{{ weight_unit }}</span>%
+            <label class="slider-label" for="weight_unit_master">סנכרון אחוזי השפעה:</label>
+            <input type="range" id="weight_unit_master" min="0" max="100" value="80" oninput="syncSliders()">
+            <button type="button" onclick="syncSliders()">סנכרן</button>
         </div>
+
+        <!-- Individual unit sliders -->
+        {% for unit in ['הנדסה', 'מאב', 'מהן', 'מעמ', 'מתן', 'מטס', 'תשתיות'] %}
+        <div class="slider-container">
+            <label class="slider-label" for="weight_unit_{{ unit }}">אחוז השפעה ל-{{ unit }}:</label>
+            <input type="range" id="weight_unit_{{ unit }}" name="weight_unit_{{ unit }}" min="0" max="100" 
+                   value="80" oninput="updateUnitSliderValue('weight_unit_{{ unit }}')">
+            <span class="slider-value" id="weight_unit_{{ unit }}_value">80</span>%
+        </div>
+        {% endfor %}
+
         <label for="file">בחר קובץ:</label>
         <input type="file" name="file" required><br><br>
 
@@ -244,7 +325,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 <th>יחידה</th>
                 <th>דירוג חייל</th>
                 <th>דירוג יחידה</th>
-                <th>ממוצע</th>
+                <th>אחוז השפעה יחידה</th>
+                <th>אחוז השפעה חייל</th>
+                <th>ממוצע (חייל+יחידה)</th>
+                <th>ממוצע יחידה</th>
             </tr>
             {% for assignment in assignments %}
             <tr>
@@ -253,7 +337,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 <td>{{ assignment['יחידה'] }}</td>
                 <td>{{ assignment['דירוג החייל'] }}</td>
                 <td>{{ assignment['דירוג היחידה'] }}</td>
-                <td>{{ assignment['ממוצע'] }}</td>
+                <td>{{ assignment['אחוז השפעה יחידה'] }}%</td>
+                <td>{{ assignment['אחוז השפעה חייל'] }}%</td>
+                <td>{{ "%.2f"|format(assignment['ממוצע']) }}</td>
+                <td>{{ "%.2f"|format(assignment['ממוצע יחידה']) }}</td>
             </tr>
             {% endfor %}
         </table>
