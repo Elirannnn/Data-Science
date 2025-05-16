@@ -1,5 +1,6 @@
 # Terminal Commands:
 
-python -m venv venv
-venv\Scripts\activate
-pip install -r requirements.txt
+pip install flask flask_cors  
+pip install pandas  
+pip install openpyxl  
+python app.py
